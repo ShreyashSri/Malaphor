@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Info, Shield, BarChart, FileText, Route } from "lucide-react"
+import { AlertTriangle, Info, Shield, BarChart, FileText, Route, CloudCog } from "lucide-react"
 import CloudResourceGraph from "@/components/cloud-resource-graph"
 import AnomalyList from "@/components/anomaly-list"
 import MetricsPanel from "@/components/metrics-panel"
@@ -13,7 +13,18 @@ import SecurityPanel from "@/components/security-panel"
 import ResourceAnalysisPanel from "@/components/resource-analysis-panel"
 import ReportPanel from "@/components/report-panel"
 import PathAnalysisPanel from "@/components/path-analysis-panel"
-import { fetchCloudGraph, fetchAnomalies, fetchMetrics } from "@/lib/api"
+import AwsDashboard from "@/components/aws/AwsDashboard"
+import { 
+  fetchCloudGraph, 
+  fetchAnomalies, 
+  fetchMetrics, 
+  fetchAwsDeployments, 
+  fetchAwsHealthChecks, 
+  fetchAwsServices,
+  AwsDeployment,
+  AwsHealthCheck,
+  AwsService
+} from "@/lib/api"
 
 interface Node {
   id: string
@@ -85,6 +96,9 @@ export default function Dashboard() {
     anomaliesDetected: 0,
     criticalAlerts: 0,
   })
+  const [awsDeployments, setAwsDeployments] = useState<AwsDeployment[]>([])
+  const [awsHealthChecks, setAwsHealthChecks] = useState<AwsHealthCheck[]>([])
+  const [awsServices, setAwsServices] = useState<AwsService[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Mock data for new components
@@ -185,15 +199,21 @@ export default function Dashboard() {
     async function loadData() {
       setIsLoading(true)
       try {
-        const [graphData, anomalyData, metricsData] = await Promise.all([
+        const [graphData, anomalyData, metricsData, deployments, healthChecks, services] = await Promise.all([
           fetchCloudGraph(),
           fetchAnomalies(),
           fetchMetrics(),
+          fetchAwsDeployments(),
+          fetchAwsHealthChecks(),
+          fetchAwsServices(),
         ])
 
         setCloudGraph(graphData)
         setAnomalies(anomalyData)
         setMetrics(metricsData)
+        setAwsDeployments(deployments)
+        setAwsHealthChecks(healthChecks)
+        setAwsServices(services)
       } catch (error) {
         console.error("Failed to load data:", error)
       } finally {
@@ -233,7 +253,7 @@ export default function Dashboard() {
         )}
 
         <Tabs defaultValue="graph" className="space-y-4">
-          <TabsList className="grid grid-cols-6 w-full max-w-3xl">
+          <TabsList className="grid grid-cols-7 w-full max-w-3xl">
             <TabsTrigger value="graph">
               <Route className="w-4 h-4 mr-2" />
               Graph
@@ -257,6 +277,10 @@ export default function Dashboard() {
             <TabsTrigger value="anomalies">
               <AlertTriangle className="w-4 h-4 mr-2" />
               Anomalies
+            </TabsTrigger>
+            <TabsTrigger value="aws">
+              <CloudCog className="w-4 h-4 mr-2" />
+              AWS
             </TabsTrigger>
           </TabsList>
 
@@ -373,6 +397,26 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <AnomalyList anomalies={anomalies} />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="aws" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>AWS Cloud Management</CardTitle>
+                <CardDescription>
+                  Comprehensive management of AWS cloud resources, deployments, and services
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <AwsDashboard />
                 )}
               </CardContent>
             </Card>
