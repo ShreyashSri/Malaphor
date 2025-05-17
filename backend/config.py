@@ -21,9 +21,7 @@ class Settings(BaseSettings):
     MODEL_PATH: str = os.getenv("MODEL_PATH", "./models/best_model.pt")
     MODEL_THRESHOLD: float = float(os.getenv("MODEL_THRESHOLD", "0.7"))
 
-    # AWS Configuration
-    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    # AWS Configuration (placeholder for future use)
     AWS_REGION: str = os.getenv("AWS_REGION", "us-west-2")
 
     class Config:
