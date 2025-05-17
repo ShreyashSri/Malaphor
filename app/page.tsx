@@ -10,11 +10,73 @@ import CloudResourceGraph from "@/components/cloud-resource-graph"
 import AnomalyList from "@/components/anomaly-list"
 import MetricsPanel from "@/components/metrics-panel"
 import { fetchCloudGraph, fetchAnomalies, fetchMetrics } from "@/lib/api"
+import { ThemeToggle } from "@/components/theme-toggle"
+
+interface Node {
+  id: string
+  label: string
+  title?: string
+  group?: string
+  shape?: string
+  color?: {
+    background?: string
+    border?: string
+    highlight?: {
+      background?: string
+      border?: string
+    }
+  }
+  font?: {
+    color?: string
+  }
+}
+
+interface Edge {
+  id: string
+  from: string
+  to: string
+  label?: string
+  title?: string
+  color?: string
+  width?: number
+  dashes?: boolean
+  arrows?: {
+    to?: {
+      enabled?: boolean
+      type?: string
+    }
+  }
+}
+
+interface Anomaly {
+  id: string
+  title: string
+  description: string
+  severity: "critical" | "high" | "medium" | "low"
+  timestamp: string
+  resourceIds: string[]
+  resourceType: string
+  affectedResources: {
+    id: string
+    name: string
+    type: string
+  }[]
+  detectionMethod: string
+  suggestedAction: string
+  isNew?: boolean
+}
+
+interface Metrics {
+  totalResources: number
+  riskScore: number
+  anomaliesDetected: number
+  criticalAlerts: number
+}
 
 export default function Dashboard() {
-  const [cloudGraph, setCloudGraph] = useState({ nodes: [], edges: [] })
-  const [anomalies, setAnomalies] = useState([])
-  const [metrics, setMetrics] = useState({
+  const [cloudGraph, setCloudGraph] = useState<{ nodes: Node[]; edges: Edge[] }>({ nodes: [], edges: [] })
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [metrics, setMetrics] = useState<Metrics>({
     totalResources: 0,
     riskScore: 0,
     anomaliesDetected: 0,
@@ -53,7 +115,10 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold tracking-tight">Malaphor Dashboard</h1>
             <p className="text-muted-foreground">AI-Enhanced Threat Hunting for Cloud Environments</p>
           </div>
-          <Button className="bg-blue-600 hover:bg-blue-700">Run New Analysis</Button>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Button className="bg-blue-600 hover:bg-blue-700">Run New Analysis</Button>
+          </div>
         </div>
 
         {/* Metrics Cards */}
