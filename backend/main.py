@@ -2,12 +2,19 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import uvicorn
 import argparse
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+import os
+from security.aws_client import AWSClient
+from security.storage_analyzer import StorageAnalyzer
+from security.network_analyzer import NetworkAnalyzer
+from security.iam_analyzer import IAMAnalyzer
+from chatbot.chatbot import ChatEntry, get_chatbot
 
 from config import get_settings, Settings
 from models.schemas import (
@@ -18,7 +25,7 @@ from integration.cloud_providers import get_cloud_provider
 from inference.inference import CloudSecurityInference
 from repositories.graph import GraphRepository
 
-# Enhanced logging configuration
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -37,12 +44,12 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Enable CORS with more specific configuration
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Update with specific origins for production
+    allow_origins=["*"],  # In production, replace with your frontend URL
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -54,6 +61,15 @@ class AWSConfig(BaseModel):
     aws_access_key_id: str
     aws_secret_access_key: str
     region_name: Optional[str] = "us-east-1"
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[ChatEntry]
+
+class ChatResponse(BaseModel):
+    response: str
+    timestamp: datetime
+
 # Enhanced error handling middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -321,7 +337,8 @@ async def root():
             {"path": "/api/anomalies", "method": "GET", "description": "Get detected anomalies"},
             {"path": "/api/metrics", "method": "GET", "description": "Get system metrics"},
             {"path": "/api/analyze", "method": "POST", "description": "Analyze cloud resources"},
-            {"path": "/api/analysis/{analysis_id}", "method": "GET", "description": "Get analysis results"}
+            {"path": "/api/analysis/{analysis_id}", "method": "GET", "description": "Get analysis results"},
+            {"path": "/api/chat", "method": "POST", "description": "Chat with the AI assistant about security findings and logs"}
         ]
     }
 
@@ -351,13 +368,17 @@ async def analyze_cloud_security(config: AWSConfig):
             "iam": iam_analyzer.analyze(graph_data)
         }
         
+        # Add change tracking information
+        findings["changes"] = graph_data.get("changes", {})
+        
         return {
             "status": "success",
             "findings": findings,
-            "total_findings": sum(len(f) for f in findings.values())
+            "total_findings": sum(len(f) for f in findings.values() if isinstance(f, list))
         }
         
     except Exception as e:
+        logger.error(f"Security analysis failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/analysis/{analysis_id}", response_model=AnalysisResponse)
@@ -370,13 +391,14 @@ async def get_analysis(analysis_id: str):
         )
     return analysis_results[analysis_id]
 
-@app.get("/api/graph", response_model=Graph)
-async def get_cloud_graph(
-    repo: GraphRepository = Depends(get_graph_repository)
-):
+@app.get("/api/graph")
+async def get_cloud_graph():
     """Get the cloud infrastructure graph data"""
     try:
-        return await repo.get_cloud_graph()
+        return {
+            "nodes": MOCK_NODES,
+            "edges": MOCK_EDGES
+        }
     except Exception as e:
         logger.error(f"Failed to get cloud graph: {e}")
         raise HTTPException(
@@ -406,6 +428,24 @@ async def get_metrics():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get metrics: {str(e)}"
+        )
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest):
+    """Chat with the AI assistant about security findings and logs."""
+    try:
+        chatbot = get_chatbot()
+        response = await chatbot.chat(request.message, request.history)
+        
+        return ChatResponse(
+            response=response,
+            timestamp=datetime.utcnow()
+        )
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Chat error: {str(e)}"
         )
 
 if __name__ == "__main__":
