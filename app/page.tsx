@@ -5,22 +5,181 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Info } from "lucide-react"
+import { AlertTriangle, Info, Shield, BarChart, FileText, Route } from "lucide-react"
 import CloudResourceGraph from "@/components/cloud-resource-graph"
 import AnomalyList from "@/components/anomaly-list"
 import MetricsPanel from "@/components/metrics-panel"
+import SecurityPanel from "@/components/security-panel"
+import ResourceAnalysisPanel from "@/components/resource-analysis-panel"
+import ReportPanel from "@/components/report-panel"
+import PathAnalysisPanel from "@/components/path-analysis-panel"
 import { fetchCloudGraph, fetchAnomalies, fetchMetrics } from "@/lib/api"
 
+interface Node {
+  id: string
+  label: string
+  title?: string
+  group?: string
+  shape?: string
+  color?: {
+    background?: string
+    border?: string
+    highlight?: {
+      background?: string
+      border?: string
+    }
+  }
+  font?: {
+    color?: string
+  }
+}
+
+interface Edge {
+  id: string
+  from: string
+  to: string
+  label?: string
+  title?: string
+  color?: string
+  width?: number
+  dashes?: boolean
+  arrows?: {
+    to?: {
+      enabled?: boolean
+      type?: string
+    }
+  }
+}
+
+interface Anomaly {
+  id: string
+  title: string
+  description: string
+  severity: "critical" | "high" | "medium" | "low"
+  timestamp: string
+  resourceIds: string[]
+  resourceType: string
+  affectedResources: {
+    id: string
+    name: string
+    type: string
+  }[]
+  detectionMethod: string
+  suggestedAction: string
+  isNew?: boolean
+}
+
+interface Metrics {
+  totalResources: number
+  riskScore: number
+  anomaliesDetected: number
+  criticalAlerts: number
+}
+
 export default function Dashboard() {
-  const [cloudGraph, setCloudGraph] = useState({ nodes: [], edges: [] })
-  const [anomalies, setAnomalies] = useState([])
-  const [metrics, setMetrics] = useState({
+  const [cloudGraph, setCloudGraph] = useState<{ nodes: Node[]; edges: Edge[] }>({ nodes: [], edges: [] })
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [metrics, setMetrics] = useState<Metrics>({
     totalResources: 0,
     riskScore: 0,
     anomaliesDetected: 0,
     criticalAlerts: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
+
+  // Mock data for new components
+  const securityData = {
+    findings: [
+      {
+        type: "Public Access",
+        severity: "high" as const,
+        resource: "S3 Bucket",
+        provider: "AWS",
+        message: "Public access enabled on production bucket",
+      },
+      {
+        type: "Weak Password",
+        severity: "medium" as const,
+        resource: "IAM User",
+        provider: "AWS",
+        message: "Password policy not enforced",
+      },
+    ],
+    score: {
+      overall: 75,
+      high: 2,
+      medium: 5,
+      low: 8,
+    },
+  }
+
+  const resourceData = {
+    metrics: [
+      {
+        value: "$1,245.67",
+        label: "Monthly Cost",
+        change: { value: "+12%", direction: "increase" as const },
+      },
+      {
+        value: "42%",
+        label: "CPU Utilization",
+        change: { value: "+2%", direction: "neutral" as const },
+      },
+      {
+        value: "68%",
+        label: "Memory Usage",
+        change: { value: "+8%", direction: "increase" as const },
+      },
+      {
+        value: "5.2TB",
+        label: "Total Storage",
+        change: { value: "+0.8TB", direction: "increase" as const },
+      },
+    ],
+    resourceDistribution: [
+      { type: "Compute Instances", count: 12, percentage: 48 },
+      { type: "Storage Services", count: 8, percentage: 32 },
+      { type: "Networking Resources", count: 4, percentage: 16 },
+      { type: "Other Services", count: 1, percentage: 4 },
+    ],
+    recommendations: [
+      {
+        title: "Resize underutilized instances",
+        description: "3 instances have been running at <20% CPU utilization for the past 30 days.",
+        potentialSavings: "Potential Monthly Savings: $320",
+      },
+      {
+        title: "Remove unattached storage volumes",
+        description: "5 storage volumes are not attached to any resources.",
+        potentialSavings: "Potential Monthly Savings: $45",
+      },
+    ],
+  }
+
+  const pathData = {
+    paths: [
+      {
+        id: "1",
+        nodes: [
+          { id: "1", type: "IAM User", name: "admin-user", provider: "AWS" },
+          { id: "2", type: "Role", name: "admin-role", provider: "AWS" },
+          { id: "3", type: "S3 Bucket", name: "sensitive-data", provider: "AWS" },
+        ],
+        risk: "high" as const,
+        description: "Direct access path from admin user to sensitive data bucket",
+      },
+    ],
+  }
+
+  const reportData = {
+    scheduledReports: [],
+    onGenerateReport: (format: string) => {
+      console.log("Generating report in format:", format)
+    },
+    onScheduleReport: (frequency: string, recipients: string[]) => {
+      console.log("Scheduling report:", { frequency, recipients })
+    },
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -74,10 +233,31 @@ export default function Dashboard() {
         )}
 
         <Tabs defaultValue="graph" className="space-y-4">
-          <TabsList className="grid grid-cols-3 w-full max-w-md">
-            <TabsTrigger value="graph">Resource Graph</TabsTrigger>
-            <TabsTrigger value="anomalies">Anomalies</TabsTrigger>
-            <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsList className="grid grid-cols-6 w-full max-w-3xl">
+            <TabsTrigger value="graph">
+              <Route className="w-4 h-4 mr-2" />
+              Graph
+            </TabsTrigger>
+            <TabsTrigger value="security">
+              <Shield className="w-4 h-4 mr-2" />
+              Security
+            </TabsTrigger>
+            <TabsTrigger value="resources">
+              <BarChart className="w-4 h-4 mr-2" />
+              Resources
+            </TabsTrigger>
+            <TabsTrigger value="paths">
+              <Route className="w-4 h-4 mr-2" />
+              Paths
+            </TabsTrigger>
+            <TabsTrigger value="reports">
+              <FileText className="w-4 h-4 mr-2" />
+              Reports
+            </TabsTrigger>
+            <TabsTrigger value="anomalies">
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Anomalies
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="graph" className="space-y-4">
@@ -102,6 +282,82 @@ export default function Dashboard() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="security" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Security Analysis</CardTitle>
+                <CardDescription>Comprehensive security findings and risk assessment</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <SecurityPanel findings={securityData.findings} score={securityData.score} />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="resources" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Resource Analysis</CardTitle>
+                <CardDescription>Resource utilization, distribution, and optimization recommendations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <ResourceAnalysisPanel
+                    metrics={resourceData.metrics}
+                    resourceDistribution={resourceData.resourceDistribution}
+                    recommendations={resourceData.recommendations}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="paths" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Access Path Analysis</CardTitle>
+                <CardDescription>Identified risky access paths in your cloud environment</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <PathAnalysisPanel paths={pathData.paths} />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Report Generation</CardTitle>
+                <CardDescription>Generate and schedule security reports</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <ReportPanel {...reportData} />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="anomalies" className="space-y-4">
             <Card>
               <CardHeader>
@@ -118,40 +374,6 @@ export default function Dashboard() {
                 ) : (
                   <AnomalyList anomalies={anomalies} />
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="insights" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Insights</CardTitle>
-                <CardDescription>Actionable intelligence derived from graph analysis</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Identity Access Patterns</AlertTitle>
-                    <AlertDescription>
-                      3 service accounts have excessive permissions that violate least privilege principles.
-                    </AlertDescription>
-                  </Alert>
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Resource Configuration Analysis</AlertTitle>
-                    <AlertDescription>
-                      5 storage buckets have public access enabled, creating potential data exposure risks.
-                    </AlertDescription>
-                  </Alert>
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Network Connectivity Insights</AlertTitle>
-                    <AlertDescription>
-                      Several instances in the production VPC have unnecessary connectivity to development environments.
-                    </AlertDescription>
-                  </Alert>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
