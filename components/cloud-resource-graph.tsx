@@ -128,6 +128,7 @@ export default function CloudResourceGraph({ data }: Props) {
         width: 1.5,
         shadow: true,
         smooth: {
+          enabled: true,
           type: "continuous",
           roundness: 0.5,
         },
