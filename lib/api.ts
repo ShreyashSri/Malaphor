@@ -1,6 +1,8 @@
 // This file would be replaced with actual API calls to your FastAPI backend
 // Mock data for the prototype
 
+import * as awsDataSimulator from './aws-data-simulator';
+
 interface Node {
   id: string
   label: string
@@ -37,6 +39,81 @@ interface Metrics {
   riskScore: number
   anomaliesDetected: number
   criticalAlerts: number
+}
+
+export interface AwsDeployment {
+  id: string;
+  service: string;
+  version: string;
+  status: 'success' | 'failure' | 'in-progress';
+  environment?: string;
+  timestamp: string;
+  commit: string;
+  commitUrl?: string;
+  triggeredBy: string;
+  region?: string;
+  duration: number | null;
+  artifacts?: {
+    imageTag: string;
+    buildId: string;
+  };
+}
+
+export interface AwsHealthCheck {
+  id: string;
+  service: string;
+  resource: string;
+  resourceType: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  message: string;
+  timestamp: string;
+  region: string;
+  lastChecked: string;
+  metrics: {
+    responseTime: number;
+    successRate: number;
+  };
+}
+
+export interface CommitInfo {
+  hash: string;
+  message: string;
+  author: string;
+  timestamp: string;
+}
+
+export interface VersionInfo {
+  version: string;
+  deployedAt: string;
+  status: 'active' | 'inactive';
+  commits: CommitInfo[];
+}
+
+export interface AwsService {
+  id: string;
+  name: string;
+  region: string;
+  environment: string;
+  type: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  lastDeployment: string;
+  lastUpdatedAt?: string;
+  repository: string;
+  commits: CommitInfo[];
+  versions?: string[];
+  resources?: {
+    type: string;
+    count: number;
+  }[];
+  metrics?: {
+    cpu?: number;
+    memory?: number;
+    network?: number;
+    cost?: number;
+  };
+  dependencies?: string[];
+  tags?: Record<string, string>;
 }
 
 export async function fetchCloudGraph() {
@@ -227,4 +304,151 @@ export async function fetchMetrics() {
   }
 
   return metrics
+}
+
+// Helper function to generate mock timestamps from recent days
+function generateTimestamp(daysAgo = 0, hoursAgo = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  date.setHours(date.getHours() - hoursAgo);
+  return date.toISOString();
+}
+
+// Helper function to generate random version number
+function generateVersion(major = 1, minor = 0) {
+  return `${major}.${minor}.${Math.floor(Math.random() * 10)}`;
+}
+
+// Helper function to generate commit hash
+function generateCommitHash() {
+  const chars = '0123456789abcdef';
+  let result = '';
+  for (let i = 0; i < 40; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// AWS Data API functions
+export async function fetchAwsDeployments(): Promise<AwsDeployment[]> {
+  return awsDataSimulator.fetchAwsDeployments();
+}
+
+export async function fetchAwsHealthChecks(): Promise<AwsHealthCheck[]> {
+  return awsDataSimulator.fetchAwsHealthChecks();
+}
+
+export async function fetchAwsServices(): Promise<AwsService[]> {
+  return awsDataSimulator.fetchAwsServices();
+}
+
+// AWS Simulation Controls
+export async function startAwsSimulation(interval = 10000): Promise<boolean> {
+  return awsDataSimulator.startAwsSimulation(interval);
+}
+
+export async function stopAwsSimulation(): Promise<boolean> {
+  return awsDataSimulator.stopAwsSimulation();
+}
+
+export async function simulateAwsIssue() {
+  return awsDataSimulator.simulateAwsIssue();
+}
+
+export async function simulateAwsRecovery(service: string, region: string) {
+  return awsDataSimulator.simulateAwsRecovery(service, region);
+}
+
+// Deployment simulation
+export async function simulateAwsDeployment() {
+  return awsDataSimulator.simulateServiceDeployment();
+}
+
+// Security scan simulation
+export async function simulateAwsSecurityScan() {
+  return awsDataSimulator.simulateSecurityScan();
+}
+
+// Dashboard data
+export type Widget = {
+  id: string;
+  title: string;
+  type: 'stat' | 'line' | 'bar' | 'pie' | 'table' | 'status';
+  data: any;
+  config?: any;
+};
+
+export type Dashboard = {
+  id: string;
+  title: string;
+  description?: string;
+  widgets: Widget[];
+};
+
+// Other API functions can remain, but should be marked as mock data
+// They'll be replaced as we implement more simulators
+
+export function getSecurityInsights() {
+  return {
+    vulnerabilities: [
+      {
+        id: "vuln-1",
+        title: "Log4j Vulnerability CVE-2021-44228",
+        description: "Remote code execution vulnerability in Apache Log4j",
+        severity: "critical",
+        affected: ["api-service", "auth-service"],
+        status: "open",
+        remediation: "Update Log4j to version 2.17.1 or later",
+      },
+      {
+        id: "vuln-2",
+        title: "Outdated TLS Configuration",
+        description: "TLS 1.0 and 1.1 are deprecated and insecure",
+        severity: "high",
+        affected: ["load-balancer", "gateway"],
+        status: "in-progress",
+        remediation: "Update to TLS 1.2 or 1.3",
+      },
+    ],
+    complianceStatus: [
+      {
+        standard: "PCI DSS",
+        status: "compliant",
+        lastScan: "2023-06-12T08:23:45Z",
+        findings: 0,
+      },
+      {
+        standard: "HIPAA",
+        status: "non-compliant",
+        lastScan: "2023-06-12T08:23:45Z",
+        findings: 3,
+      },
+      {
+        standard: "SOC 2",
+        status: "compliant",
+        lastScan: "2023-06-10T14:58:37Z",
+        findings: 0,
+      },
+    ],
+    securityEvents: [
+      {
+        id: "event-1",
+        timestamp: "2023-06-12T04:23:17Z",
+        type: "brute-force-attempt",
+        source: "203.0.113.42",
+        target: "auth-service",
+        severity: "medium",
+        description: "Multiple failed login attempts",
+      },
+      {
+        id: "event-2",
+        timestamp: "2023-06-12T02:15:44Z",
+        type: "unusual-access",
+        source: "internal",
+        target: "database",
+        severity: "high",
+        description: "Unusual database query pattern detected",
+      },
+    ],
+  };
 }
