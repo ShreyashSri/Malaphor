@@ -1,5 +1,4 @@
-# FastAPI backend code that would be deployed separately
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from datetime import datetime
@@ -7,6 +6,7 @@ import uuid
 from typing import List, Dict, Optional
 import uvicorn
 import argparse
+from fastapi.responses import JSONResponse
 
 from config import get_settings, Settings
 from models.schemas import (
@@ -15,8 +15,9 @@ from models.schemas import (
 )
 from integration.cloud_providers import get_cloud_provider
 from inference.inference import CloudSecurityInference
+from repositories.graph import GraphRepository
 
-# Configure logging
+# Enhanced logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -35,18 +36,68 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Enable CORS
+# Enable CORS with more specific configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For production, specify actual origins
+    allow_origins=["*"],  # TODO: Update with specific origins for production
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
 # Global variables
 inference_engine = None
 analysis_results = {}
+
+# Enhanced error handling middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = datetime.utcnow()
+    try:
+        response = await call_next(request)
+        end_time = datetime.utcnow()
+        duration = (end_time - start_time).total_seconds()
+        logger.info(
+            "request_processed",
+            extra={
+                "path": request.url.path,
+                "method": request.method,
+                "duration": duration,
+                "status_code": response.status_code
+            }
+        )
+        return response
+    except Exception as e:
+        logger.error(
+            "request_failed",
+            extra={
+                "path": request.url.path,
+                "method": request.method,
+                "error": str(e)
+            },
+            exc_info=True
+        )
+        raise
+
+# Enhanced exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    settings = get_settings()
+    if settings.DEBUG:
+        detail = str(exc)
+    else:
+        detail = "An internal server error occurred"
+    
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            error="Internal Server Error",
+            detail=detail,
+            code=500
+        ).dict()
+    )
 
 # Health Check
 @app.get("/health")
@@ -258,6 +309,11 @@ async def analyze_cloud_graph(
             detail=f"Analysis failed: {str(e)}"
         )
 
+# Dependency injection
+def get_graph_repository(settings: Settings = Depends(get_settings)) -> GraphRepository:
+    """Get graph repository instance."""
+    return GraphRepository(settings)
+
 # Routes
 @app.get("/")
 async def root():
@@ -300,14 +356,13 @@ async def get_analysis(analysis_id: str):
         )
     return analysis_results[analysis_id]
 
-@app.get("/api/graph")
-async def get_cloud_graph():
+@app.get("/api/graph", response_model=Graph)
+async def get_cloud_graph(
+    repo: GraphRepository = Depends(get_graph_repository)
+):
     """Get the cloud infrastructure graph data"""
     try:
-        return {
-            "nodes": MOCK_NODES,
-            "edges": MOCK_EDGES
-        }
+        return await repo.get_cloud_graph()
     except Exception as e:
         logger.error(f"Failed to get cloud graph: {e}")
         raise HTTPException(
@@ -338,16 +393,6 @@ async def get_metrics():
             status_code=500,
             detail=f"Failed to get metrics: {str(e)}"
         )
-
-# Error handlers
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    logger.error(f"Unhandled exception: {exc}")
-    return ErrorResponse(
-        error="Internal Server Error",
-        detail=str(exc),
-        code=500
-    )
 
 if __name__ == "__main__":
     import uvicorn
