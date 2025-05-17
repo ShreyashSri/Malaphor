@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Info, Shield, BarChart, FileText, Route, CloudCog } from "lucide-react"
+import { AlertTriangle, Info, Shield, BarChart, FileText, Route, CloudCog, CloudCog } from "lucide-react"
 import CloudResourceGraph from "@/components/cloud-resource-graph"
 import AnomalyList from "@/components/anomaly-list"
 import MetricsPanel from "@/components/metrics-panel"
@@ -333,6 +333,10 @@ export default function Dashboard() {
               <CloudCog className="w-4 h-4 mr-2" />
               AWS
             </TabsTrigger>
+            <TabsTrigger value="aws">
+              <CloudCog className="w-4 h-4 mr-2" />
+              AWS
+            </TabsTrigger>
           </TabsList>
 
             <TabsContent value="graph" className="space-y-4">
@@ -453,6 +457,26 @@ export default function Dashboard() {
               </Card>
             </TabsContent>
   
+          <TabsContent value="aws" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>AWS Cloud Management</CardTitle>
+                <CardDescription>
+                  Comprehensive management of AWS cloud resources, deployments, and services
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <AwsDashboard />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="aws" className="space-y-4">
             <Card>
               <CardHeader>
