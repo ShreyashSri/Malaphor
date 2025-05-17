@@ -8,8 +8,8 @@ from typing import Dict, Any, List
 import logging
 import uuid
 
-from backend.models.gnn_model import CloudSecurityGNN
-from backend.data.graph_dataset import CloudResourceGraph
+from models.gnn_model import CloudSecurityGNN
+from data.graph_dataset import CloudResourceGraph
 
 logger = logging.getLogger(__name__)
 

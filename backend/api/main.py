@@ -99,11 +99,12 @@ metrics = {
     'critical_alerts': 0
 }
 analysis_in_progress = False
+model_required = False  # Flag to indicate if model is required for operation
 
 # Dependency to get inference engine
 def get_inference_engine():
-    global inference_engine
-    if inference_engine is None:
+    global inference_engine, model_required
+    if inference_engine is None and model_required:
         try:
             inference_engine = CloudSecurityInference(MODEL_PATH)
             logger.info(f"Loaded model from {MODEL_PATH}")
@@ -235,10 +236,41 @@ async def get_status():
     global analysis_in_progress
     return {"analysis_in_progress": analysis_in_progress}
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        return {
+            "status": "healthy",
+            "message": "API is running",
+            "timestamp": datetime.now().isoformat(),
+            "model_status": {
+                "required": model_required,
+                "loaded": inference_engine is not None,
+                "path": MODEL_PATH
+            },
+            "features": {
+                "graph_generation": True,
+                "anomaly_detection": model_required and inference_engine is not None
+            }
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "degraded",
+            "message": str(e),
+            "timestamp": datetime.now().isoformat(),
+            "model_status": {
+                "required": model_required,
+                "loaded": inference_engine is not None,
+                "path": MODEL_PATH
+            }
+        }
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    # Load model
+    # Try to load model but don't fail if it's not available
     try:
         get_inference_engine()
     except Exception as e:
@@ -249,12 +281,12 @@ async def startup_event():
     global cloud_graph
     cloud_graph = generator.generate_graph(num_nodes=25, edge_probability=0.1, anomaly_probability=0.5)
     
-    # Run initial analysis
-    try:
-        inference_engine = get_inference_engine()
-        await analyze_cloud_graph(cloud_graph, inference_engine)
-    except Exception as e:
-        logger.warning(f"Initial analysis failed: {e}")
+    # Run initial analysis only if model is loaded
+    if inference_engine is not None:
+        try:
+            await analyze_cloud_graph(cloud_graph, inference_engine)
+        except Exception as e:
+            logger.warning(f"Initial analysis failed: {e}")
 
 if __name__ == "__main__":
     import uvicorn
