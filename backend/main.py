@@ -1,12 +1,19 @@
 # FastAPI backend code that would be deployed separately
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 import logging
 from datetime import datetime
 import uuid
 from typing import List, Dict, Optional
 import uvicorn
 import argparse
+from pydantic import BaseModel
+import os
+from security.aws_client import AWSClient
+from security.storage_analyzer import StorageAnalyzer
+from security.network_analyzer import NetworkAnalyzer
+from security.iam_analyzer import IAMAnalyzer
 
 from config import get_settings, Settings
 from models.schemas import (
@@ -30,7 +37,7 @@ logger = logging.getLogger('malaphor')
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Malaphor API",
+    title="Malaphor Security Analysis API",
     description="AI-Enhanced Threat Hunting for Cloud Environments",
     version="0.1.0"
 )
@@ -38,7 +45,7 @@ app = FastAPI(
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For production, specify actual origins
+    allow_origins=["*"],  # In production, replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,25 +55,21 @@ app.add_middleware(
 inference_engine = None
 analysis_results = {}
 
+class AWSConfig(BaseModel):
+    aws_access_key_id: str
+    aws_secret_access_key: str
+    region_name: Optional[str] = "us-east-1"
+
 # Health Check
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
-    """Health check endpoint"""
-    try:
-        # Check if we can access the settings
-        settings = get_settings()
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "version": "0.1.0",
-            "environment": "development" if settings.DEBUG else "production"
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail=f"Service unhealthy: {str(e)}"
-        )
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "malaphor-security-api"}
+
+@app.get("/health")
+async def health_check_redirect():
+    """Redirect /health to /api/health for backward compatibility."""
+    return RedirectResponse(url="/api/health")
 
 # Mock data for development and testing
 MOCK_NODES: List[Node] = [
@@ -273,22 +276,40 @@ async def root():
         ]
     }
 
-@app.post("/api/analyze", response_model=AnalysisResponse)
-async def analyze(
-    request: AnalysisRequest,
-    background_tasks: BackgroundTasks,
-    settings: Settings = Depends(get_settings),
-    inference_engine: CloudSecurityInference = Depends(get_inference_engine)
-):
-    """Analyze cloud resources for security anomalies"""
+@app.post("/api/analyze")
+async def analyze_cloud_security(config: AWSConfig):
+    """Analyze cloud security using AWS credentials."""
     try:
-        return await analyze_cloud_graph(request, inference_engine, settings)
-    except Exception as e:
-        logger.error(f"Analysis request failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
+        # Initialize AWS client
+        aws_client = AWSClient(
+            aws_access_key_id=config.aws_access_key_id,
+            aws_secret_access_key=config.aws_secret_access_key,
+            region_name=config.region_name
         )
+        
+        # Get cloud graph data
+        graph_data = aws_client.get_cloud_graph_data()
+        
+        # Initialize analyzers
+        storage_analyzer = StorageAnalyzer()
+        network_analyzer = NetworkAnalyzer()
+        iam_analyzer = IAMAnalyzer()
+        
+        # Run analysis
+        findings = {
+            "storage": storage_analyzer.analyze(graph_data),
+            "network": network_analyzer.analyze(graph_data),
+            "iam": iam_analyzer.analyze(graph_data)
+        }
+        
+        return {
+            "status": "success",
+            "findings": findings,
+            "total_findings": sum(len(f) for f in findings.values())
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/analysis/{analysis_id}", response_model=AnalysisResponse)
 async def get_analysis(analysis_id: str):
