@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Info, Shield, BarChart, FileText, Route } from "lucide-react"
+import { AlertTriangle, Info, Shield, BarChart, FileText, Route, CloudCog } from "lucide-react"
 import CloudResourceGraph from "@/components/cloud-resource-graph"
 import AnomalyList from "@/components/anomaly-list"
 import MetricsPanel from "@/components/metrics-panel"
@@ -16,7 +16,18 @@ import PathAnalysisPanel from "@/components/path-analysis-panel"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
 import Welcome from "@/components/welcome"
-import { fetchCloudGraph, fetchAnomalies, fetchMetrics } from "@/lib/api"
+import AwsDashboard from "@/components/aws/AwsDashboard"
+import { 
+  fetchCloudGraph, 
+  fetchAnomalies, 
+  fetchMetrics, 
+  fetchAwsDeployments, 
+  fetchAwsHealthChecks, 
+  fetchAwsServices,
+  AwsDeployment,
+  AwsHealthCheck,
+  AwsService
+} from "@/lib/api"
 import useApiStatus from "@/hooks/use-api-status"
 
 interface Node {
@@ -91,6 +102,9 @@ export default function Dashboard() {
     anomaliesDetected: 0,
     criticalAlerts: 0,
   })
+  const [awsDeployments, setAwsDeployments] = useState<AwsDeployment[]>([])
+  const [awsHealthChecks, setAwsHealthChecks] = useState<AwsHealthCheck[]>([])
+  const [awsServices, setAwsServices] = useState<AwsService[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Initialize welcomeDismissed state from localStorage after mount
@@ -208,15 +222,21 @@ export default function Dashboard() {
       
       setIsLoading(true)
       try {
-        const [graphData, anomalyData, metricsData] = await Promise.all([
+        const [graphData, anomalyData, metricsData, deployments, healthChecks, services] = await Promise.all([
           fetchCloudGraph(),
           fetchAnomalies(),
           fetchMetrics(),
+          fetchAwsDeployments(),
+          fetchAwsHealthChecks(),
+          fetchAwsServices(),
         ])
 
         setCloudGraph(graphData)
         setAnomalies(anomalyData)
         setMetrics(metricsData)
+        setAwsDeployments(deployments)
+        setAwsHealthChecks(healthChecks)
+        setAwsServices(services)
       } catch (error) {
         console.error("Failed to load data:", error)
       } finally {
@@ -284,7 +304,7 @@ export default function Dashboard() {
           )}
 
           <Tabs defaultValue="graph" className="space-y-4">
-            <TabsList className="grid grid-cols-6 w-full max-w-3xl">
+            <TabsList className="grid grid-cols-7 w-full max-w-3xl">
               <TabsTrigger value="graph">
                 <Route className="w-4 h-4 mr-2" />
                 Graph
@@ -309,7 +329,15 @@ export default function Dashboard() {
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 Anomalies
               </TabsTrigger>
-            </TabsList>
+              <TabsTrigger value="aws">
+              <CloudCog className="w-4 h-4 mr-2" />
+              AWS
+            </TabsTrigger>
+            <TabsTrigger value="aws">
+              <CloudCog className="w-4 h-4 mr-2" />
+              AWS
+            </TabsTrigger>
+          </TabsList>
 
             <TabsContent value="graph" className="space-y-4">
               <Card>
@@ -428,7 +456,47 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
-          </Tabs>
+  
+          <TabsContent value="aws" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>AWS Cloud Management</CardTitle>
+                <CardDescription>
+                  Comprehensive management of AWS cloud resources, deployments, and services
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <AwsDashboard />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="aws" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>AWS Cloud Management</CardTitle>
+                <CardDescription>
+                  Comprehensive management of AWS cloud resources, deployments, and services
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                  </div>
+                ) : (
+                  <AwsDashboard />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
         </div>
       </main>
 
