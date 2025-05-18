@@ -1,7 +1,9 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Container, Box, Typography, Tabs, Tab } from '@mui/material';
-import SecurityAnalysis from './components/SecurityAnalysis';
-import LogUpload from './components/LogUpload';
+import { Box, Container, Typography, Tabs, Tab } from '@mui/material';
+import SecurityAnalysis from '../../components/security-analysis';
+import LogUpload from '../../components/log-upload';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -29,7 +31,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-function App() {
+export default function SecurityPage() {
   const [tabValue, setTabValue] = useState(0);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
 
@@ -76,6 +78,4 @@ function App() {
       </Box>
     </Container>
   );
-}
-
-export default App; 
+} 

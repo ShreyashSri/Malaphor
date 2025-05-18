@@ -1,0 +1,38 @@
+2025-05-18 05:55:27,931 - uvicorn.error - INFO - Started server process [17288]
+2025-05-18 05:55:27,934 - uvicorn.error - INFO - Waiting for application startup.
+2025-05-18 05:55:27,934 - uvicorn.error - INFO - Application startup complete.
+2025-05-18 05:55:27,935 - uvicorn.error - INFO - Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2025-05-18 05:55:44,848 - malaphor - INFO - request_processed
+2025-05-18 05:55:44,857 - malaphor - INFO - request_processed
+2025-05-18 05:56:44,083 - malaphor - INFO - request_processed
+2025-05-18 05:56:44,087 - malaphor - INFO - request_processed
+2025-05-18 05:58:04,167 - malaphor - INFO - request_processed
+2025-05-18 05:58:04,169 - malaphor - INFO - request_processed
+2025-05-18 05:58:04,174 - malaphor - INFO - request_processed
+2025-05-18 05:58:04,175 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,240 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,247 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,251 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,255 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,266 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,270 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,274 - malaphor - INFO - request_processed
+2025-05-18 05:58:33,278 - malaphor - INFO - request_processed
+2025-05-18 05:58:46,976 - malaphor - INFO - request_processed
+2025-05-18 05:58:46,980 - malaphor - INFO - request_processed
+2025-05-18 06:03:03,267 - uvicorn.error - INFO - Shutting down
+2025-05-18 06:03:03,376 - uvicorn.error - INFO - Waiting for application shutdown.
+2025-05-18 06:03:03,379 - uvicorn.error - INFO - Application shutdown complete.
+2025-05-18 06:03:03,380 - uvicorn.error - INFO - Finished server process [17288]
+2025-05-18 06:03:13,079 - uvicorn.error - INFO - Started server process [21600]
+2025-05-18 06:03:13,080 - uvicorn.error - INFO - Waiting for application startup.
+2025-05-18 06:03:13,081 - uvicorn.error - INFO - Application startup complete.
+2025-05-18 06:03:13,083 - uvicorn.error - INFO - Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2025-05-18 06:21:23,363 - malaphor - INFO - request_processed
+2025-05-18 06:21:23,371 - malaphor - INFO - request_processed
+2025-05-18 06:26:41,254 - malaphor - INFO - request_processed
+2025-05-18 06:26:41,256 - malaphor - INFO - request_processed
+2025-05-18 06:26:41,260 - malaphor - INFO - request_processed
+2025-05-18 06:26:41,262 - malaphor - INFO - request_processed
+2025-05-18 06:26:51,687 - malaphor - INFO - request_processed
+2025-05-18 06:26:51,693 - malaphor - INFO - request_processed

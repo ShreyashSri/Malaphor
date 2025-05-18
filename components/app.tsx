@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Box, Typography, Tabs, Tab } from '@mui/material';
-import SecurityAnalysis from './components/SecurityAnalysis';
-import LogUpload from './components/LogUpload';
+import SecurityAnalysis from './security-analysis';
+import LogUpload from './log-upload';
 
 interface TabPanelProps {
   children?: React.ReactNode;

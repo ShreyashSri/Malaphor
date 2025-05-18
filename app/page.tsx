@@ -18,6 +18,9 @@ import Footer from "@/components/footer"
 import Welcome from "@/components/welcome"
 import { fetchCloudGraph, fetchAnomalies, fetchMetrics } from "@/lib/api"
 import useApiStatus from "@/hooks/use-api-status"
+import SecurityAnalysis from '../components/security-analysis'
+import LogUpload from '../components/log-upload'
+import { Box, Container, Typography, Tab } from '@mui/material'
 
 interface Node {
   id: string
@@ -80,6 +83,32 @@ interface Metrics {
   criticalAlerts: number
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { isApiOnline, isChecking, errorMessage, checkApiStatus, offlineMode, toggleOfflineMode } = useApiStatus()
   const [welcomeDismissed, setWelcomeDismissed] = useState<boolean>(false)
@@ -92,6 +121,8 @@ export default function Dashboard() {
     criticalAlerts: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [tabValue, setTabValue] = useState(0)
+  const [analysisResults, setAnalysisResults] = useState<any>(null)
 
   // Initialize welcomeDismissed state from localStorage after mount
   useEffect(() => {
@@ -226,6 +257,14 @@ export default function Dashboard() {
 
     loadData()
   }, [offlineMode])
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const handleAnalysisComplete = (results: any) => {
+    setAnalysisResults(results);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -429,6 +468,32 @@ export default function Dashboard() {
               </Card>
             </TabsContent>
           </Tabs>
+
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs value={tabValue} onChange={handleTabChange}>
+              <Tab label="AWS API Analysis" />
+              <Tab label="Log Upload" />
+            </Tabs>
+          </Box>
+
+          <TabPanel value={tabValue} index={0}>
+            <SecurityAnalysis onAnalysisComplete={handleAnalysisComplete} />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            <LogUpload onAnalysisComplete={handleAnalysisComplete} />
+          </TabPanel>
+
+          {analysisResults && (
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h5" gutterBottom>
+                Analysis Results
+              </Typography>
+              <pre style={{ whiteSpace: 'pre-wrap' }}>
+                {JSON.stringify(analysisResults, null, 2)}
+              </pre>
+            </Box>
+          )}
         </div>
       </main>
 

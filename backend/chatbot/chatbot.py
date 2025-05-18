@@ -3,6 +3,11 @@ from typing import List, Dict, Any, Optional
 import google.generativeai as genai
 from pydantic import BaseModel
 import logging
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger('malaphor')
 
@@ -24,59 +29,70 @@ If the user asks anything unrelated to Malaphor or its functionalities, respond 
 Always keep responses clear, accurate, and limited to Malaphor content only.
 """
 
-class Chatbot:
-    def __init__(self, config: ChatbotConfig):
-        self.config = config
-        genai.configure(api_key=config.api_key)
-        self.model = genai.GenerativeModel(config.model_name)
+class ChatBot:
+    def __init__(self):
+        # Initialize Gemini API
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
         
-    def _format_history(self, chat_history: List[ChatEntry]) -> List[Dict[str, Any]]:
-        """Format chat history for Gemini API."""
-        formatted_history = []
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-pro')
+        self.chat = self.model.start_chat(history=[])
         
-        for entry in chat_history:
-            if entry.role in ["user", "model"]:
-                formatted_history.append({
-                    "role": entry.role,
-                    "parts": [{"text": entry.text}]
-                })
+    async def chat(self, message: str, history: List[Dict[str, str]]) -> str:
+        """
+        Process a chat message and return a response.
         
-        if not formatted_history or formatted_history[0]["role"] != "user":
-            formatted_history.insert(0, {
-                "role": "user",
-                "parts": [{"text": "Hello!"}]
-            })
+        Args:
+            message: The user's message
+            history: List of previous messages in the format [{"role": "user/assistant", "content": "message"}]
             
-        return formatted_history
-    
-    async def chat(self, user_input: str, chat_history: List[ChatEntry]) -> str:
-        """Process a chat message and return the response."""
+        Returns:
+            The assistant's response
+        """
         try:
-            formatted_history = self._format_history(chat_history)
+            # Add context about the system's capabilities
+            context = """You are a security analysis assistant for the Malaphor platform. 
+            You help users understand their cloud security logs and provide insights about potential security issues.
+            Focus on:
+            1. Explaining security findings in simple terms
+            2. Providing actionable recommendations
+            3. Helping users understand their log data
+            4. Identifying patterns and anomalies in security logs
+            """
             
-            chat = self.model.start_chat(
-                history=formatted_history,
+            # Format the conversation history
+            formatted_history = []
+            for msg in history:
+                role = "user" if msg["role"] == "user" else "model"
+                formatted_history.append({"role": role, "parts": [msg["content"]]})
+            
+            # Add the current message
+            formatted_history.append({"role": "user", "parts": [message]})
+            
+            # Generate response
+            response = await self.model.generate_content(
+                contents=formatted_history,
                 generation_config={
-                    "temperature": self.config.temperature
-                },
-                system_instruction={
-                    "role": "system",
-                    "parts": [{"text": SYSTEM_PROMPT}]
+                    "temperature": 0.7,
+                    "top_p": 0.8,
+                    "top_k": 40,
                 }
             )
             
-            response = await chat.send_message(user_input)
-            return response.text or "Sorry, I didn't understand that."
+            return response.text
             
         except Exception as e:
             logger.error(f"Chat error: {str(e)}")
-            return "Sorry, I am experiencing technical issues. Please try again later."
+            return f"I apologize, but I encountered an error: {str(e)}. Please try again."
 
-def get_chatbot() -> Chatbot:
-    """Get or create a chatbot instance."""
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set")
-        
-    config = ChatbotConfig(api_key=api_key)
-    return Chatbot(config) 
+# Create a singleton instance
+_chatbot_instance = None
+
+def get_chatbot() -> ChatBot:
+    """Get or create the chatbot instance."""
+    global _chatbot_instance
+    if _chatbot_instance is None:
+        _chatbot_instance = ChatBot()
+    return _chatbot_instance 
