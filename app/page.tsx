@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Info, Shield, BarChart, FileText, Route, CloudCog } from "lucide-react"
+import { AlertTriangle, Info, Shield, BarChart, FileText, Route, CloudCog, Security, MessageSquare } from "lucide-react"
 import CloudResourceGraph from "@/components/cloud-resource-graph"
 import AnomalyList from "@/components/anomaly-list"
 import MetricsPanel from "@/components/metrics-panel"
@@ -29,6 +29,9 @@ import {
   AwsService
 } from "@/lib/api"
 import useApiStatus from "@/hooks/use-api-status"
+import { Box, Typography, Grid } from '@mui/material';
+import Link from 'next/link';
+import { Security as SecurityIcon, Analytics as AnalyticsIcon, Chat as ChatIcon } from '@mui/icons-material';
 
 interface Node {
   id: string
@@ -91,416 +94,118 @@ interface Metrics {
   criticalAlerts: number
 }
 
-export default function Dashboard() {
-  const { isApiOnline, isChecking, errorMessage, checkApiStatus, offlineMode, toggleOfflineMode } = useApiStatus()
-  const [welcomeDismissed, setWelcomeDismissed] = useState<boolean>(false)
-  const [cloudGraph, setCloudGraph] = useState<{ nodes: Node[]; edges: Edge[] }>({ nodes: [], edges: [] })
-  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
-  const [metrics, setMetrics] = useState<Metrics>({
-    totalResources: 0,
-    riskScore: 0,
-    anomaliesDetected: 0,
-    criticalAlerts: 0,
-  })
-  const [awsDeployments, setAwsDeployments] = useState<AwsDeployment[]>([])
-  const [awsHealthChecks, setAwsHealthChecks] = useState<AwsHealthCheck[]>([])
-  const [awsServices, setAwsServices] = useState<AwsService[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Initialize welcomeDismissed state from localStorage after mount
-  useEffect(() => {
-    const savedWelcomeDismissed = typeof window !== 'undefined'
-      ? localStorage.getItem('welcomeDismissed') === 'true'
-      : false;
-    setWelcomeDismissed(savedWelcomeDismissed);
-  }, []);
-
-  const handleDismissWelcome = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('welcomeDismissed', 'true');
-    }
-    setWelcomeDismissed(true);
-  }
-
-  // Mock data for new components
-  const securityData = {
-    findings: [
-      {
-        type: "Public Access",
-        severity: "high" as const,
-        resource: "S3 Bucket",
-        provider: "AWS",
-        message: "Public access enabled on production bucket",
-      },
-      {
-        type: "Weak Password",
-        severity: "medium" as const,
-        resource: "IAM User",
-        provider: "AWS",
-        message: "Password policy not enforced",
-      },
-    ],
-    score: {
-      overall: 75,
-      high: 2,
-      medium: 5,
-      low: 8,
-    },
-  }
-
-  const resourceData = {
-    metrics: [
-      {
-        value: "$1,245.67",
-        label: "Monthly Cost",
-        change: { value: "+12%", direction: "increase" as const },
-      },
-      {
-        value: "42%",
-        label: "CPU Utilization",
-        change: { value: "+2%", direction: "neutral" as const },
-      },
-      {
-        value: "68%",
-        label: "Memory Usage",
-        change: { value: "+8%", direction: "increase" as const },
-      },
-      {
-        value: "5.2TB",
-        label: "Total Storage",
-        change: { value: "+0.8TB", direction: "increase" as const },
-      },
-    ],
-    resourceDistribution: [
-      { type: "Compute Instances", count: 12, percentage: 48 },
-      { type: "Storage Services", count: 8, percentage: 32 },
-      { type: "Networking Resources", count: 4, percentage: 16 },
-      { type: "Other Services", count: 1, percentage: 4 },
-    ],
-    recommendations: [
-      {
-        title: "Resize underutilized instances",
-        description: "3 instances have been running at <20% CPU utilization for the past 30 days.",
-        potentialSavings: "Potential Monthly Savings: $320",
-      },
-      {
-        title: "Remove unattached storage volumes",
-        description: "5 storage volumes are not attached to any resources.",
-        potentialSavings: "Potential Monthly Savings: $45",
-      },
-    ],
-  }
-
-  const pathData = {
-    paths: [
-      {
-        id: "1",
-        nodes: [
-          { id: "1", type: "IAM User", name: "admin-user", provider: "AWS" },
-          { id: "2", type: "Role", name: "admin-role", provider: "AWS" },
-          { id: "3", type: "S3 Bucket", name: "sensitive-data", provider: "AWS" },
-        ],
-        risk: "high" as const,
-        description: "Direct access path from admin user to sensitive data bucket",
-      },
-    ],
-  }
-
-  const reportData = {
-    scheduledReports: [],
-    onGenerateReport: (format: string) => {
-      console.log("Generating report in format:", format)
-    },
-    onScheduleReport: (frequency: string, recipients: string[]) => {
-      console.log("Scheduling report:", { frequency, recipients })
-    },
-  }
-
-  useEffect(() => {
-    async function loadData() {
-      if (offlineMode) return
-      
-      setIsLoading(true)
-      try {
-        const [graphData, anomalyData, metricsData, deployments, healthChecks, services] = await Promise.all([
-          fetchCloudGraph(),
-          fetchAnomalies(),
-          fetchMetrics(),
-          fetchAwsDeployments(),
-          fetchAwsHealthChecks(),
-          fetchAwsServices(),
-        ])
-
-        setCloudGraph(graphData)
-        setAnomalies(anomalyData)
-        setMetrics(metricsData)
-        setAwsDeployments(deployments)
-        setAwsHealthChecks(healthChecks)
-        setAwsServices(services)
-      } catch (error) {
-        console.error("Failed to load data:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadData()
-  }, [offlineMode])
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header apiStatus={isApiOnline} />
-      
-      <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-        <div className="container mx-auto">
-          {!isChecking && !isApiOnline && !offlineMode && (
-            <Alert className="mb-6 bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              <AlertTitle className="text-yellow-600 dark:text-yellow-400">API Connection Issue</AlertTitle>
-              <AlertDescription className="flex items-center justify-between">
-                <span>{errorMessage || 'Failed to connect to the API'}</span>
-                <div className="space-x-2">
-                  <Button variant="outline" size="sm" onClick={checkApiStatus}>
-                    Retry Connection
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={toggleOfflineMode}>
-                    Work Offline
-                  </Button>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {!welcomeDismissed && <Welcome onDismiss={handleDismissWelcome} />}
-
-          <div className="flex flex-col space-y-2 md:flex-row md:justify-between md:items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Malaphor Dashboard</h1>
-              <p className="text-muted-foreground">AI-Enhanced Threat Hunting for Cloud Environments</p>
-            </div>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={!isApiOnline && !offlineMode}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Hero Section */}
+      <div className="text-center mb-16">
+        <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl md:text-6xl">
+          Welcome to Malaphor
+        </h1>
+        <p className="mt-3 max-w-md mx-auto text-base text-gray-500 dark:text-gray-400 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+          AI-Powered Cloud Security Analysis
+        </p>
+        <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
+          <div className="rounded-md shadow">
+            <Link
+              href="/security"
+              className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10"
             >
-              Run New Analysis
-            </Button>
+              Start Analysis
+            </Link>
           </div>
-
-          {/* Metrics Cards */}
-          <div className="grid gap-4 md:grid-cols-4 mb-6">
-            <MetricsPanel metrics={metrics} />
-          </div>
-
-          {/* Critical Alerts */}
-          {anomalies.filter((a) => a.severity === "critical").length > 0 && (
-            <Alert className="mb-6 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-              <AlertTitle className="text-red-600 dark:text-red-400">Critical Anomalies Detected</AlertTitle>
-              <AlertDescription>
-                {anomalies.filter((a) => a.severity === "critical").length} critical security anomalies have been detected
-                in your cloud environment.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Tabs defaultValue="graph" className="space-y-4">
-            <TabsList className="grid grid-cols-7 w-full max-w-3xl">
-              <TabsTrigger value="graph">
-                <Route className="w-4 h-4 mr-2" />
-                Graph
-              </TabsTrigger>
-              <TabsTrigger value="security">
-                <Shield className="w-4 h-4 mr-2" />
-                Security
-              </TabsTrigger>
-              <TabsTrigger value="resources">
-                <BarChart className="w-4 h-4 mr-2" />
-                Resources
-              </TabsTrigger>
-              <TabsTrigger value="paths">
-                <Route className="w-4 h-4 mr-2" />
-                Paths
-              </TabsTrigger>
-              <TabsTrigger value="reports">
-                <FileText className="w-4 h-4 mr-2" />
-                Reports
-              </TabsTrigger>
-              <TabsTrigger value="anomalies">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Anomalies
-              </TabsTrigger>
-              <TabsTrigger value="aws">
-              <CloudCog className="w-4 h-4 mr-2" />
-              AWS
-            </TabsTrigger>
-            <TabsTrigger value="aws">
-              <CloudCog className="w-4 h-4 mr-2" />
-              AWS
-            </TabsTrigger>
-          </TabsList>
-
-            <TabsContent value="graph" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Cloud Resource Relationship Graph</CardTitle>
-                  <CardDescription>
-                    Visualizing connections between cloud resources, identities, and configurations
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="h-[600px] w-full border-t">
-                    {isLoading ? (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                      </div>
-                    ) : (
-                      <CloudResourceGraph data={cloudGraph} />
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="security" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Security Analysis</CardTitle>
-                  <CardDescription>Comprehensive security findings and risk assessment</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <SecurityPanel findings={securityData.findings} score={securityData.score} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="resources" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Resource Analysis</CardTitle>
-                  <CardDescription>Resource utilization, distribution, and optimization recommendations</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <ResourceAnalysisPanel
-                      metrics={resourceData.metrics}
-                      resourceDistribution={resourceData.resourceDistribution}
-                      recommendations={resourceData.recommendations}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="paths" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Access Path Analysis</CardTitle>
-                  <CardDescription>Identified risky access paths in your cloud environment</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <PathAnalysisPanel paths={pathData.paths} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="reports" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Report Generation</CardTitle>
-                  <CardDescription>Generate and schedule security reports</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <ReportPanel {...reportData} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="anomalies" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Detected Anomalies</CardTitle>
-                  <CardDescription>
-                    Unusual patterns and potential security threats detected by GNN analysis
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <AnomalyList anomalies={anomalies} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-  
-          <TabsContent value="aws" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>AWS Cloud Management</CardTitle>
-                <CardDescription>
-                  Comprehensive management of AWS cloud resources, deployments, and services
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="h-64 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                  </div>
-                ) : (
-                  <AwsDashboard />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="aws" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>AWS Cloud Management</CardTitle>
-                <CardDescription>
-                  Comprehensive management of AWS cloud resources, deployments, and services
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="h-64 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                  </div>
-                ) : (
-                  <AwsDashboard />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
         </div>
-      </main>
+      </div>
 
-      <Footer />
+      {/* Features Section */}
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="pt-6">
+          <div className="flow-root bg-white dark:bg-gray-800 rounded-lg px-6 pb-8">
+            <div className="-mt-6">
+              <div>
+                <span className="inline-flex items-center justify-center p-3 bg-blue-500 rounded-md shadow-lg">
+                  <Shield className="h-6 w-6 text-white" aria-hidden="true" />
+                </span>
+              </div>
+              <h3 className="mt-8 text-lg font-medium text-gray-900 dark:text-white tracking-tight">
+                Security Analysis
+              </h3>
+              <p className="mt-5 text-base text-gray-500 dark:text-gray-400">
+                Upload your CloudTrail logs for comprehensive security analysis and threat detection.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-6">
+          <div className="flow-root bg-white dark:bg-gray-800 rounded-lg px-6 pb-8">
+            <div className="-mt-6">
+              <div>
+                <span className="inline-flex items-center justify-center p-3 bg-blue-500 rounded-md shadow-lg">
+                  <BarChart className="h-6 w-6 text-white" aria-hidden="true" />
+                </span>
+              </div>
+              <h3 className="mt-8 text-lg font-medium text-gray-900 dark:text-white tracking-tight">
+                Detailed Insights
+              </h3>
+              <p className="mt-5 text-base text-gray-500 dark:text-gray-400">
+                Get detailed insights into your cloud security posture with actionable recommendations.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-6">
+          <div className="flow-root bg-white dark:bg-gray-800 rounded-lg px-6 pb-8">
+            <div className="-mt-6">
+              <div>
+                <span className="inline-flex items-center justify-center p-3 bg-blue-500 rounded-md shadow-lg">
+                  <MessageSquare className="h-6 w-6 text-white" aria-hidden="true" />
+                </span>
+              </div>
+              <h3 className="mt-8 text-lg font-medium text-gray-900 dark:text-white tracking-tight">
+                AI Assistant
+              </h3>
+              <p className="mt-5 text-base text-gray-500 dark:text-gray-400">
+                Chat with our AI assistant to understand your security findings and get help.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* How It Works Section */}
+      <div className="mt-24 text-center">
+        <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white sm:text-4xl">
+          How It Works
+        </h2>
+        <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              1. Upload Logs
+            </h3>
+            <p className="mt-2 text-base text-gray-500 dark:text-gray-400">
+              Upload your AWS CloudTrail logs in JSON format
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              2. Analysis
+            </h3>
+            <p className="mt-2 text-base text-gray-500 dark:text-gray-400">
+              Our AI analyzes your logs for security issues and patterns
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              3. Get Insights
+            </h3>
+            <p className="mt-2 text-base text-gray-500 dark:text-gray-400">
+              Receive detailed findings and recommendations
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

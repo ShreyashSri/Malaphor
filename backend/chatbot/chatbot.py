@@ -9,20 +9,40 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('malaphor')
+
+# System knowledge for the chatbot
+MALAPHOR_KNOWLEDGE = """
+You are a helpful and professional chatbot for Malaphor - AI-Enhanced Threat Hunting for Cloud Environments.
+Your primary role is to assist users with the analysis of cloud access logs.
+If the user asks anything unrelated to Malaphor or its functionalities, respond with:
+"This chatbot is designed to assist only with Malaphor features and related queries. Please keep your questions focused on the platform."
+
+Always keep responses clear, accurate, and limited to Malaphor content only.
+"""
 
 class ChatBot:
     def __init__(self):
-        # Initialize Gemini API
-        api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        try:
+            # Initialize Gemini API
+            api_key = os.getenv('GEMINI_API_KEY')
+            logger.debug(f"API Key found: {'Yes' if api_key else 'No'}")
+            
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY environment variable is not set")
+            
+            genai.configure(api_key=api_key)
+            # Use the latest model
+            self.model = genai.GenerativeModel('gemini-1.5-pro')
+            logger.info("ChatBot initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Error initializing ChatBot: {str(e)}")
+            raise
         
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
-        self.chat = self.model.start_chat(history=[])
-        
-    async def chat(self, message: str, history: List[Dict[str, str]]) -> str:
+    async def get_response(self, message: str, history: List[Dict[str, str]]) -> str:
         """
         Process a chat message and return a response.
         
@@ -34,28 +54,35 @@ class ChatBot:
             The assistant's response
         """
         try:
-            # Add context about the system's capabilities
-            context = """You are a security analysis assistant for the Malaphor platform. 
-            You help users understand their cloud security logs and provide insights about potential security issues.
-            Focus on:
-            1. Explaining security findings in simple terms
-            2. Providing actionable recommendations
-            3. Helping users understand their log data
-            4. Identifying patterns and anomalies in security logs
-            """
+            logger.debug(f"Processing message: {message}")
+            logger.debug(f"History length: {len(history)}")
             
-            # Format the conversation history
+            # Format chat history: only user and model roles
             formatted_history = []
             for msg in history:
-                role = "user" if msg["role"] == "user" else "model"
-                formatted_history.append({"role": role, "parts": [msg["content"]]})
+                if msg["role"] in ["user", "assistant"]:
+                    role = "user" if msg["role"] == "user" else "model"
+                    formatted_history.append({
+                        "role": role,
+                        "parts": [{"text": msg["content"]}]
+                    })
             
-            # Add the current message
-            formatted_history.append({"role": "user", "parts": [message]})
+            # Ensure there's at least one user message
+            if not formatted_history or formatted_history[0]["role"] != "user":
+                logger.warning("First message must be from user. Adding a dummy message.")
+                formatted_history.insert(0, {
+                    "role": "user",
+                    "parts": [{"text": "Hello!"}]
+                })
             
-            # Generate response
-            response = await self.model.generate_content(
-                contents=formatted_history,
+            logger.debug("Starting chat session")
+            # Start chat session
+            chat = self.model.start_chat(history=formatted_history)
+            
+            logger.debug("Sending message to chat")
+            # Send message and get response
+            response = await chat.send_message(
+                f"{MALAPHOR_KNOWLEDGE}\n\nUser message: {message}",
                 generation_config={
                     "temperature": 0.7,
                     "top_p": 0.8,
@@ -63,10 +90,18 @@ class ChatBot:
                 }
             )
             
+            logger.debug(f"Received response from Gemini API: {response}")
+            
+            if not response:
+                raise ValueError("No response received from model")
+                
+            if not response.text:
+                raise ValueError("Empty text in response from model")
+                
             return response.text
             
         except Exception as e:
-            logger.error(f"Chat error: {str(e)}")
+            logger.error(f"Chat error: {str(e)}", exc_info=True)
             return f"I apologize, but I encountered an error: {str(e)}. Please try again."
 
 # Create a singleton instance

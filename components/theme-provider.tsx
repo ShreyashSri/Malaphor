@@ -1,24 +1,19 @@
 "use client"
 
-import { ThemeProvider as MUIThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
+import type { ThemeProviderProps } from 'next-themes';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
-    <MUIThemeProvider theme={theme}>
-      <CssBaseline />
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      storageKey="malaphor-theme"
+      {...props}
+    >
       {children}
-    </MUIThemeProvider>
+    </NextThemesProvider>
   );
 }

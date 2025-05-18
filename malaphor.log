@@ -1,0 +1,8 @@
+2025-05-18 06:59:26,556 - uvicorn.error - INFO - Started server process [6772]
+2025-05-18 06:59:26,557 - uvicorn.error - INFO - Waiting for application startup.
+2025-05-18 06:59:26,558 - uvicorn.error - INFO - Application startup complete.
+2025-05-18 06:59:26,559 - uvicorn.error - INFO - Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2025-05-18 07:00:37,883 - malaphor - INFO - request_processed
+2025-05-18 07:00:37,939 - malaphor - INFO - request_processed
+2025-05-18 07:05:15,475 - malaphor - INFO - request_processed
+2025-05-18 07:05:15,495 - malaphor - INFO - request_processed
