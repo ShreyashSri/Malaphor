@@ -1,4 +1,8 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request, UploadFile, File
+import tempfile
+import os
+import json
+from terraform_parser import parse_terraform
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from datetime import datetime
@@ -7,6 +11,7 @@ from typing import List, Dict, Optional
 import uvicorn
 import argparse
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from config import get_settings, Settings
 from models.schemas import (
@@ -28,6 +33,16 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger('malaphor')
+
+class TerraformAnalysisRequest(BaseModel):
+    file: UploadFile
+
+class ComparisonResponse(BaseModel):
+    terraform_graph: Graph
+    actual_graph: Graph
+    differences: List[Dict]
+    analysis_id: str
+    timestamp: datetime
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -394,6 +409,126 @@ async def get_metrics():
             detail=f"Failed to get metrics: {str(e)}"
         )
 
+@app.post("/api/analyze/terraform", response_model=AnalysisResponse)
+async def analyze_terraform(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    settings: Settings = Depends(get_settings),
+    inference_engine: CloudSecurityInference = Depends(get_inference_engine)
+):
+    """Analyze Terraform template for security anomalies"""
+    try:
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        # Parse Terraform
+        tf_graph = parse_terraform(temp_path)
+        
+        # Clean up
+        os.unlink(temp_path)
+        
+        # Analyze the Terraform-generated graph
+        request = AnalysisRequest(graph=tf_graph)
+        return await analyze_cloud_graph(request, inference_engine, settings)
+        
+    except Exception as e:
+        logger.error(f"Terraform analysis failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Terraform analysis failed: {str(e)}"
+        )
+
+@app.post("/api/compare", response_model=ComparisonResponse)
+async def compare_graphs(
+    terraform_analysis_id: str,
+    actual_analysis_id: str,
+    repo: GraphRepository = Depends(get_graph_repository)
+):
+    """Compare Terraform graph with actual cloud graph"""
+    try:
+        # Get both graphs
+        terraform_graph = analysis_results.get(terraform_analysis_id)
+        actual_graph = analysis_results.get(actual_analysis_id)
+        
+        if not terraform_graph or not actual_graph:
+            raise HTTPException(
+                status_code=404,
+                detail="One or both analysis IDs not found"
+            )
+        
+        # Simple comparison
+        differences = []
+        
+        # Compare nodes
+        tf_nodes = {n['id']: n for n in terraform_graph.graph['nodes']}
+        actual_nodes = {n['id']: n for n in actual_graph.graph['nodes']}
+        
+        # Find nodes in Terraform but not in actual
+        for node_id, node in tf_nodes.items():
+            if node_id not in actual_nodes:
+                differences.append({
+                    'type': 'node_missing_in_actual',
+                    'resource_id': node_id,
+                    'resource_type': node.get('group', 'unknown'),
+                    'description': f"Resource defined in Terraform but not found in actual environment"
+                })
+        
+        # Find nodes in actual but not in Terraform
+        for node_id, node in actual_nodes.items():
+            if node_id not in tf_nodes:
+                differences.append({
+                    'type': 'node_missing_in_terraform',
+                    'resource_id': node_id,
+                    'resource_type': node.get('group', 'unknown'),
+                    'description': f"Resource found in actual environment but not defined in Terraform"
+                })
+        
+        # Compare edges (relationships)
+        tf_edges = {(e['from'], e['to']): e for e in terraform_graph.graph['edges']}
+        actual_edges = {(e['from'], e['to']): e for e in actual_graph.graph['edges']}
+        
+        # Find edges in Terraform but not in actual
+        for (from_id, to_id), edge in tf_edges.items():
+            if (from_id, to_id) not in actual_edges:
+                differences.append({
+                    'type': 'edge_missing_in_actual',
+                    'from': from_id,
+                    'to': to_id,
+                    'description': f"Relationship defined in Terraform but not found in actual environment"
+                })
+        
+        # Find edges in actual but not in Terraform
+        for (from_id, to_id), edge in actual_edges.items():
+            if (from_id, to_id) not in tf_edges:
+                differences.append({
+                    'type': 'edge_missing_in_terraform',
+                    'from': from_id,
+                    'to': to_id,
+                    'description': f"Relationship found in actual environment but not defined in Terraform"
+                })
+        
+        # Create response
+        analysis_id = str(uuid.uuid4())
+        response = ComparisonResponse(
+            terraform_graph=terraform_graph.graph,
+            actual_graph=actual_graph.graph,
+            differences=differences,
+            analysis_id=analysis_id,
+            timestamp=datetime.utcnow()
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Comparison failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Comparison failed: {str(e)}"
+        )
+    
 if __name__ == "__main__":
     import uvicorn
     settings = get_settings()

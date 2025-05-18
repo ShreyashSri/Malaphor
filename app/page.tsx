@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Info, Shield, BarChart, FileText, Route } from "lucide-react"
+import { AlertTriangle, Info, Shield, BarChart, FileText, Route, UploadCloud, Diff } from "lucide-react"
 import CloudResourceGraph from "@/components/cloud-resource-graph"
 import AnomalyList from "@/components/anomaly-list"
 import MetricsPanel from "@/components/metrics-panel"
@@ -16,8 +16,10 @@ import PathAnalysisPanel from "@/components/path-analysis-panel"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
 import Welcome from "@/components/welcome"
-import { fetchCloudGraph, fetchAnomalies, fetchMetrics } from "@/lib/api"
+import { fetchCloudGraph, fetchAnomalies, fetchMetrics, analyzeTerraform, compareGraphs } from "@/lib/api"
 import useApiStatus from "@/hooks/use-api-status"
+import { TerraformUpload } from "@/components/terraform-upload"
+import { ComparisonView } from "@/components/comparison-view"
 
 interface Node {
   id: string
@@ -80,11 +82,37 @@ interface Metrics {
   criticalAlerts: number
 }
 
+interface AnalysisResponse {
+  analysis_id: string
+  anomalies: Anomaly[]
+  metrics: Metrics
+  graph?: {
+    nodes: Node[]
+    edges: Edge[]
+  }
+}
+
+interface ComparisonResponse {
+  terraform_graph: {
+    nodes: Node[]
+    edges: Edge[]
+  }
+  actual_graph: {
+    nodes: Node[]
+    edges: Edge[]
+  }
+  differences: any[]
+  analysis_id: string
+}
+
 export default function Dashboard() {
   const { isApiOnline, isChecking, errorMessage, checkApiStatus, offlineMode, toggleOfflineMode } = useApiStatus()
   const [welcomeDismissed, setWelcomeDismissed] = useState<boolean>(false)
   const [cloudGraph, setCloudGraph] = useState<{ nodes: Node[]; edges: Edge[] }>({ nodes: [], edges: [] })
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [showTerraformUpload, setShowTerraformUpload] = useState(false)
+  const [terraformAnalysis, setTerraformAnalysis] = useState<AnalysisResponse | null>(null)
+  const [comparisonData, setComparisonData] = useState<ComparisonResponse | null>(null)
   const [metrics, setMetrics] = useState<Metrics>({
     totalResources: 0,
     riskScore: 0,
@@ -106,6 +134,39 @@ export default function Dashboard() {
       localStorage.setItem('welcomeDismissed', 'true');
     }
     setWelcomeDismissed(true);
+  }
+
+  const handleTerraformUpload = async (file: File) => {
+    try {
+      setIsLoading(true)
+      const analysis = await analyzeTerraform(file)
+      setTerraformAnalysis(analysis)
+      setShowTerraformUpload(false)
+      
+      // Automatically compare if we have actual data
+      if (cloudGraph.nodes.length > 0) {
+        const comparison = await compareGraphs(analysis.analysis_id, "latest")
+        setComparisonData(comparison)
+      }
+    } catch (error) {
+      console.error("Terraform analysis failed:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleRunComparison = async () => {
+    if (!terraformAnalysis || cloudGraph.nodes.length === 0) return
+    
+    try {
+      setIsLoading(true)
+      const comparison = await compareGraphs(terraformAnalysis.analysis_id, "latest")
+      setComparisonData(comparison)
+    } catch (error) {
+      console.error("Comparison failed:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Mock data for new components
@@ -233,38 +294,51 @@ export default function Dashboard() {
       
       <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
         <div className="container mx-auto">
+          {/* API Connection Alert */}
           {!isChecking && !isApiOnline && !offlineMode && (
             <Alert className="mb-6 bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              <AlertTitle className="text-yellow-600 dark:text-yellow-400">API Connection Issue</AlertTitle>
-              <AlertDescription className="flex items-center justify-between">
-                <span>{errorMessage || 'Failed to connect to the API'}</span>
-                <div className="space-x-2">
-                  <Button variant="outline" size="sm" onClick={checkApiStatus}>
-                    Retry Connection
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={toggleOfflineMode}>
-                    Work Offline
-                  </Button>
-                </div>
-              </AlertDescription>
+              {/* ... existing alert content ... */}
             </Alert>
           )}
 
+          {/* Welcome Modal */}
           {!welcomeDismissed && <Welcome onDismiss={handleDismissWelcome} />}
 
+          {/* Header with Buttons */}
           <div className="flex flex-col space-y-2 md:flex-row md:justify-between md:items-center mb-6">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Malaphor Dashboard</h1>
               <p className="text-muted-foreground">AI-Enhanced Threat Hunting for Cloud Environments</p>
             </div>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={!isApiOnline && !offlineMode}
-            >
-              Run New Analysis
-            </Button>
+            <div className="flex space-x-2 mt-2 md:mt-0">
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={!isApiOnline && !offlineMode}
+              >
+                Run New Analysis
+              </Button>
+              <Button 
+                className="bg-green-600 hover:bg-green-700 text-white" // Added text-white for contrast
+                onClick={() => setShowTerraformUpload(true)}
+              >
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Upload Terraform
+              </Button>
+            </div>
           </div>
+
+          {/* Comparison Button */}
+          {terraformAnalysis && cloudGraph.nodes.length > 0 && !comparisonData && (
+            <div className="mb-6">
+              <Button 
+                variant="outline"
+                onClick={handleRunComparison}
+                disabled={isLoading}
+              >
+                Compare Terraform with Actual Environment
+              </Button>
+            </div>
+          )}
 
           {/* Metrics Cards */}
           <div className="grid gap-4 md:grid-cols-4 mb-6">
@@ -283,152 +357,192 @@ export default function Dashboard() {
             </Alert>
           )}
 
-          <Tabs defaultValue="graph" className="space-y-4">
-            <TabsList className="grid grid-cols-6 w-full max-w-3xl">
-              <TabsTrigger value="graph">
-                <Route className="w-4 h-4 mr-2" />
-                Graph
-              </TabsTrigger>
-              <TabsTrigger value="security">
-                <Shield className="w-4 h-4 mr-2" />
-                Security
-              </TabsTrigger>
-              <TabsTrigger value="resources">
-                <BarChart className="w-4 h-4 mr-2" />
-                Resources
-              </TabsTrigger>
-              <TabsTrigger value="paths">
-                <Route className="w-4 h-4 mr-2" />
-                Paths
-              </TabsTrigger>
-              <TabsTrigger value="reports">
-                <FileText className="w-4 h-4 mr-2" />
-                Reports
-              </TabsTrigger>
-              <TabsTrigger value="anomalies">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Anomalies
-              </TabsTrigger>
-            </TabsList>
+          {/* Terraform upload modal */}
+          {showTerraformUpload && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-background p-6 rounded-lg max-w-md w-full">
+                <h2 className="text-xl font-bold mb-4">Upload Terraform Template</h2>
+                <TerraformUpload onUpload={handleTerraformUpload} />
+                <Button 
+                  variant="outline" 
+                  className="mt-4 w-full"
+                  onClick={() => setShowTerraformUpload(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
 
-            <TabsContent value="graph" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Cloud Resource Relationship Graph</CardTitle>
-                  <CardDescription>
-                    Visualizing connections between cloud resources, identities, and configurations
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="h-[600px] w-full border-t">
+          {/* Comparison view */}
+          {comparisonData && (
+            <div className="mt-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Terraform vs Actual Comparison</h2>
+                <Button 
+                  variant="outline"
+                  onClick={() => setComparisonData(null)}
+                >
+                  Close Comparison
+                </Button>
+              </div>
+              <ComparisonView 
+                terraformGraph={comparisonData.terraform_graph}
+                actualGraph={comparisonData.actual_graph}
+                differences={comparisonData.differences}
+              />
+            </div>
+          )}
+
+          {/* Main content tabs - only show if not showing comparison */}
+          {!comparisonData && (
+            <Tabs defaultValue="graph" className="space-y-4">
+              <TabsList className="grid grid-cols-6 w-full max-w-3xl">
+                <TabsTrigger value="graph">
+                  <Route className="w-4 h-4 mr-2" />
+                  Graph
+                </TabsTrigger>
+                <TabsTrigger value="security">
+                  <Shield className="w-4 h-4 mr-2" />
+                  Security
+                </TabsTrigger>
+                <TabsTrigger value="resources">
+                  <BarChart className="w-4 h-4 mr-2" />
+                  Resources
+                </TabsTrigger>
+                <TabsTrigger value="paths">
+                  <Route className="w-4 h-4 mr-2" />
+                  Paths
+                </TabsTrigger>
+                <TabsTrigger value="reports">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Reports
+                </TabsTrigger>
+                <TabsTrigger value="anomalies">
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Anomalies
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="graph" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Cloud Resource Relationship Graph</CardTitle>
+                    <CardDescription>
+                      Visualizing connections between cloud resources, identities, and configurations
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="h-[600px] w-full border-t">
+                      {isLoading ? (
+                        <div className="h-full flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                        </div>
+                      ) : (
+                        <CloudResourceGraph data={cloudGraph} />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="security" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Security Analysis</CardTitle>
+                    <CardDescription>Comprehensive security findings and risk assessment</CardDescription>
+                  </CardHeader>
+                  <CardContent>
                     {isLoading ? (
-                      <div className="h-full flex items-center justify-center">
+                      <div className="h-64 flex items-center justify-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
                       </div>
                     ) : (
-                      <CloudResourceGraph data={cloudGraph} />
+                      <SecurityPanel findings={securityData.findings} score={securityData.score} />
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            <TabsContent value="security" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Security Analysis</CardTitle>
-                  <CardDescription>Comprehensive security findings and risk assessment</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <SecurityPanel findings={securityData.findings} score={securityData.score} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+              <TabsContent value="resources" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Resource Analysis</CardTitle>
+                    <CardDescription>Resource utilization, distribution, and optimization recommendations</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                      </div>
+                    ) : (
+                      <ResourceAnalysisPanel
+                        metrics={resourceData.metrics}
+                        resourceDistribution={resourceData.resourceDistribution}
+                        recommendations={resourceData.recommendations}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            <TabsContent value="resources" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Resource Analysis</CardTitle>
-                  <CardDescription>Resource utilization, distribution, and optimization recommendations</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <ResourceAnalysisPanel
-                      metrics={resourceData.metrics}
-                      resourceDistribution={resourceData.resourceDistribution}
-                      recommendations={resourceData.recommendations}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+              <TabsContent value="paths" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Access Path Analysis</CardTitle>
+                    <CardDescription>Identified risky access paths in your cloud environment</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                      </div>
+                    ) : (
+                      <PathAnalysisPanel paths={pathData.paths} />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            <TabsContent value="paths" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Access Path Analysis</CardTitle>
-                  <CardDescription>Identified risky access paths in your cloud environment</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <PathAnalysisPanel paths={pathData.paths} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+              <TabsContent value="reports" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Report Generation</CardTitle>
+                    <CardDescription>Generate and schedule security reports</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                      </div>
+                    ) : (
+                      <ReportPanel {...reportData} />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            <TabsContent value="reports" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Report Generation</CardTitle>
-                  <CardDescription>Generate and schedule security reports</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <ReportPanel {...reportData} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="anomalies" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Detected Anomalies</CardTitle>
-                  <CardDescription>
-                    Unusual patterns and potential security threats detected by GNN analysis
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <AnomalyList anomalies={anomalies} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="anomalies" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Detected Anomalies</CardTitle>
+                    <CardDescription>
+                      Unusual patterns and potential security threats detected by GNN analysis
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                      </div>
+                    ) : (
+                      <AnomalyList anomalies={anomalies} />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          )}
         </div>
       </main>
 
