@@ -33,31 +33,31 @@ Malaphor consists of the following components:
 
 1. Clone the repository:
 
-\`\`\`bash
+```bash
 git clone https://github.com/your-org/malaphor.git
 cd malaphor
-\`\`\`
+```
 
 2. Create a virtual environment:
 
-\`\`\`bash
+```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-\`\`\`
+```
 
 3. Install dependencies:
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ### Training the GNN Model
 
 To train the GNN model on synthetic data:
 
-\`\`\`bash
+```bash
 python run_training.py --generate-data --num-graphs 1000 --output-dir ./output
-\`\`\`
+```
 
 This will:
 1. Generate a synthetic dataset of cloud resource graphs
@@ -68,9 +68,9 @@ This will:
 
 To run the API server:
 
-\`\`\`bash
+```bash
 python run_api.py --model-path ./output/best_model.pt
-\`\`\`
+```
 
 The API will be available at http://localhost:8000
 
@@ -78,11 +78,11 @@ The API will be available at http://localhost:8000
 
 The web dashboard is a Next.js application that connects to the API server:
 
-\`\`\`bash
+```bash
 cd frontend
 npm install
 npm run dev
-\`\`\`
+```
 
 The dashboard will be available at http://localhost:3000
 
@@ -101,7 +101,7 @@ Key endpoints:
 
 ### Project Structure
 
-\`\`\`
+```
 malaphor/
 ├── backend/
 │   ├── api/              # FastAPI server
@@ -112,13 +112,13 @@ malaphor/
 ├── frontend/             # Next.js web dashboard
 ├── output/               # Trained models and outputs
 └── scripts/              # Utility scripts
-\`\`\`
+```
 
 ### Running Tests
 
-\`\`\`bash
+```bash
 pytest
-\`\`\`
+```
 
 ## License
 
